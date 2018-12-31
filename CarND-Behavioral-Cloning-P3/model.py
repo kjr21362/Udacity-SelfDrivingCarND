@@ -1,3 +1,5 @@
+import matplotlib; matplotlib.use('agg')
+import matplotlib.pyplot as plt
 import os
 import csv
 from sklearn.model_selection import train_test_split
@@ -13,6 +15,7 @@ from keras import backend
 
 def generator(samples, batch_size=32):
     num_samples = len(samples)
+    ANGLE_ADJUSTMENT = 0.15
     while 1: # Loop forever so the generator never terminates
         shuffle(samples)
         for offset in range(0, num_samples, batch_size):
@@ -26,6 +29,29 @@ def generator(samples, batch_size=32):
                 center_angle = float(batch_sample[3])
                 images.append(center_image)
                 angles.append(center_angle)
+                # filp images left right
+                images.append(np.fliplr(center_image))
+                angles.append(-center_angle)
+                
+                # left image
+                name = './IMG/'+batch_sample[1].split('/')[-1]
+                left_image = cv2.imread(name)
+                left_angle = float(batch_sample[3]) + ANGLE_ADJUSTMENT
+                images.append(left_image)
+                angles.append(left_angle)
+                # filp images left right
+                images.append(np.fliplr(left_image))
+                angles.append(-left_angle)
+                
+                # right image
+                name = './IMG/'+batch_sample[2].split('/')[-1]
+                right_image = cv2.imread(name)
+                right_angle = float(batch_sample[3]) - ANGLE_ADJUSTMENT
+                images.append(right_image)
+                angles.append(right_angle)
+                # filp images left right
+                images.append(np.fliplr(right_image))
+                angles.append(-right_angle)
 
             # trim image to only see section with road
             X_train = np.array(images)
@@ -66,10 +92,19 @@ model.add(Dense(10))
 model.add(Dense(1))
 
 model.compile(loss='mse', optimizer='adam')
-model.fit_generator(train_generator, steps_per_epoch= len(train_samples)/3, \
-                    validation_data=validation_generator, validation_steps=len(validation_samples)/3, \
-                    epochs=5, verbose = 1)
+history_obj = model.fit_generator(train_generator, steps_per_epoch= len(train_samples)/50, \
+                    validation_data=validation_generator, validation_steps=len(validation_samples)/50, \
+                    epochs=2, verbose = 1)
 
 #model.summary()
-model.save('model.h5')
+model.save('testmodel.h5')
 print ('model saved.')
+### plot the training and validation loss for each epoch
+plt.plot(history_obj.history['loss'])
+plt.plot(history_obj.history['val_loss'])
+plt.title('model mean squared error loss')
+plt.ylabel('mean squared error loss')
+plt.xlabel('epoch')
+plt.legend(['training set', 'validation set'], loc='upper right')
+#plt.show()
+plt.savefig('loss.jpg')

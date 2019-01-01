@@ -9,7 +9,7 @@ import sklearn
 from sklearn.utils import shuffle
 from keras.models import Sequential, Model
 from keras.layers import Cropping2D, Dense, Flatten, Lambda
-from keras.layers import Convolution2D
+from keras.layers import Convolution2D, Dropout
 from keras.layers.pooling import MaxPooling2D 
 from keras import backend
 
@@ -25,7 +25,9 @@ def generator(samples, batch_size=32):
             angles = []
             for batch_sample in batch_samples:
                 name = './IMG/'+batch_sample[0].split('/')[-1]
-                center_image = cv2.imread(name)
+                center_image = cv2.imread(name) #BGR
+                # BGR to RGB since drive.py reads images in RGB
+                center_image = cv2.cvtColor(center_image, cv2.COLOR_BGR2RGB)
                 center_angle = float(batch_sample[3])
                 images.append(center_image)
                 angles.append(center_angle)
@@ -36,6 +38,8 @@ def generator(samples, batch_size=32):
                 # left image
                 name = './IMG/'+batch_sample[1].split('/')[-1]
                 left_image = cv2.imread(name)
+                # BGR to RGB since drive.py reads images in RGB
+                left_image = cv2.cvtColor(left_image, cv2.COLOR_BGR2RGB)
                 left_angle = float(batch_sample[3]) + ANGLE_ADJUSTMENT
                 images.append(left_image)
                 angles.append(left_angle)
@@ -46,6 +50,8 @@ def generator(samples, batch_size=32):
                 # right image
                 name = './IMG/'+batch_sample[2].split('/')[-1]
                 right_image = cv2.imread(name)
+                # BGR to RGB since drive.py reads images in RGB
+                right_image = cv2.cvtColor(right_image, cv2.COLOR_BGR2RGB)
                 right_angle = float(batch_sample[3]) - ANGLE_ADJUSTMENT
                 images.append(right_image)
                 angles.append(right_angle)
@@ -61,9 +67,13 @@ def generator(samples, batch_size=32):
 samples = []
 with open('./driving_log.csv') as csvfile:
     reader = csv.reader(csvfile)
+    next(reader)
     for line in reader:
+        angle = float(line[3])
+        if angle == 0 and np.random.random_sample() > 0.5:
+                continue
         samples.append(line)
-
+print (len(samples))
 train_samples, validation_samples = train_test_split(samples, test_size=0.2)
 
 # compile and train the model using the generator function
@@ -78,13 +88,18 @@ model = Sequential()
 model.add(Cropping2D(cropping=((50,20), (0,0)), input_shape=(160,320,3)))
 model.add(Lambda(lambda x: x/127.5 - 1.))
 model.add(Convolution2D(24,5,5, subsample = (2,2), activation = 'relu'))
+model.add(Dropout(0.2))
 #model.add(MaxPooling2D(pool_size = (2,2), strides = (2,2)))
 model.add(Convolution2D(36,5,5, subsample = (2,2), activation = 'relu'))
-
-model.add(Convolution2D(48,3,3, subsample = (2,2), activation = 'relu'))
-model.add(Convolution2D(64,3,3, subsample = (2,2), activation = 'relu'))
-
+model.add(Dropout(0.2))
 #model.add(MaxPooling2D(pool_size = (2,2), strides = (2,2)))
+model.add(Convolution2D(48,3,3, subsample = (2,2), activation = 'relu'))
+model.add(Dropout(0.2))
+#model.add(MaxPooling2D(pool_size = (2,2), strides = (2,2)))
+model.add(Convolution2D(64,3,3, subsample = (2,2), activation = 'relu'))
+model.add(Dropout(0.2))
+#model.add(MaxPooling2D(pool_size = (2,2), strides = (2,2)))
+
 model.add(Flatten())
 model.add(Dense(100))
 model.add(Dense(50))
@@ -92,12 +107,12 @@ model.add(Dense(10))
 model.add(Dense(1))
 
 model.compile(loss='mse', optimizer='adam')
-history_obj = model.fit_generator(train_generator, steps_per_epoch= len(train_samples)/50, \
-                    validation_data=validation_generator, validation_steps=len(validation_samples)/50, \
-                    epochs=2, verbose = 1)
+history_obj = model.fit_generator(train_generator, steps_per_epoch= len(train_samples)/5, \
+                    validation_data=validation_generator, validation_steps=len(validation_samples)/5, \
+                    epochs=5, verbose = 1)
 
 #model.summary()
-model.save('testmodel.h5')
+model.save('model2.h5')
 print ('model saved.')
 ### plot the training and validation loss for each epoch
 plt.plot(history_obj.history['loss'])
@@ -106,5 +121,5 @@ plt.title('model mean squared error loss')
 plt.ylabel('mean squared error loss')
 plt.xlabel('epoch')
 plt.legend(['training set', 'validation set'], loc='upper right')
-#plt.show()
-plt.savefig('loss.jpg')
+
+plt.savefig('loss2.jpg')
